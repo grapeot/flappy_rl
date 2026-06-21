@@ -34,6 +34,10 @@
 - 训练前打通整条"录制→JSON→网页播放"链路并用 playwright 截图视觉验证通过（第 301 帧
   得分 6、HUD/outcome 正确、无 console 报错、管道与小鸟渲染正确）。早期风险点排除，
   可安全进入训练阶段。
+- 实现 Gymnasium env `env.py`（Layer 2）：5 维相对坐标 observation、Discrete(2)、
+  terminate（撞/出界）+ truncate（过 50 管）、两版 reward 由 `RewardConfig.mode` 切换。
+  装好 gymnasium 1.3 / SB3 2.9 / torch 2.12。配 `tests/test_env.py`（含 SB3 check_env
+  对两版均通过、reward 值语义断言），全部测试 23 个全绿，ruff lint 通过。
 
 ## Lessons Learned
 
@@ -53,3 +57,7 @@
   别被 `.gitignore` 的 `runs/` 规则误伤——示例放 `docs/` 下。
 - 本地 `file://` 直接打开 index.html 会因浏览器 CORS 拦截 fetch 而加载不出回放；必须用
   `python -m http.server` 起本地服务访问。GitHub Pages 上无此问题。
+- env.py 的两版 reward 由 `RewardConfig.mode` 切换（"sparse"/"shaped"），不要复制两份
+  env 类。observation 全部归一化（除以 height/width/max_fall_speed），改物理常量不影响
+  observation 尺度。`info` 里同时带 score 和 passed_pipe，训练时 reward 与 task metric
+  必须分开记录才能看出 reward hacking。
