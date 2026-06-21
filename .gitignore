@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.venv/
+py.typed
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# RL artifacts (large, regenerable)
+runs/
+checkpoints/
+logs/
+tensorboard/
+*.zip
+*.mp4
+videos/
+models/
+
+# OS
+.DS_Store
