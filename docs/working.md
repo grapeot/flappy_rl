@@ -25,6 +25,15 @@
   （game 已实现，不再是占位符）。
 - 物理手感验证：随机策略约 27 帧死、得分 0（瞎拍的鸟过不了第一根管——印证 sparse 之痛）；
   "对准缝隙中心"启发式 seed0 过 20 管、撑 924 帧（游戏可解，RL 有东西可学）。难度合适。
+- 实现 JSON 录制器 `recorder.py`（schema version 1，是网页播放器的 contract）和录制脚本
+  `scripts/record_episode.py`（random/heuristic/still 三种无需训练的策略）。录了一局启发式
+  回放存为 `docs/sample_episode.json`（925 帧 / 过 20 管 / 240KB）。
+- 实现网页 Canvas 播放器 `docs/player.js` + GitHub Pages 首页骨架 `docs/index.html`
+  （思路简介 + 可播放回放 + 训练结果占位区）。数据与播放解耦：一份固定播放器播任意
+  episode JSON。
+- 训练前打通整条"录制→JSON→网页播放"链路并用 playwright 截图视觉验证通过（第 301 帧
+  得分 6、HUD/outcome 正确、无 console 报错、管道与小鸟渲染正确）。早期风险点排除，
+  可安全进入训练阶段。
 
 ## Lessons Learned
 
@@ -39,3 +48,8 @@
   episode 是调试工具，不是演示。
 - 项目工作语言为中文。后续所有文档、注释、commit message 默认用中文；技术术语和代码
   标识符保留英文。
+- 回放管线先于训练打通。JSON schema（recorder.py version 1）是 `docs/player.js` 的
+  contract，改 schema 必须同步改播放器。`docs/sample_episode.json` 是进 git 的示例数据，
+  别被 `.gitignore` 的 `runs/` 规则误伤——示例放 `docs/` 下。
+- 本地 `file://` 直接打开 index.html 会因浏览器 CORS 拦截 fetch 而加载不出回放；必须用
+  `python -m http.server` 起本地服务访问。GitHub Pages 上无此问题。
