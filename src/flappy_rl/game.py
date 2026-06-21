@@ -1,30 +1,30 @@
-"""Layer 1 — pure Flappy Bird physics.
+"""Layer 1 —— 纯 Flappy Bird 物理。
 
-This module owns the game's mechanics and nothing else: no RL, no rendering, no reward.
-It is deterministic given a seed, and is the foundation the Gymnasium env (env.py) wraps.
+本模块只拥有游戏的力学机制，别无其他：没有 RL、没有渲染、没有 reward。
+给定 seed 即为确定性，是 Gymnasium env（env.py）所封装的基础。
 
-NOT YET IMPLEMENTED. This is a scaffold placeholder describing the intended shape so the
-project structure is coherent. See docs/rfc.md (Decision 3) and docs/test.md (Layer 1).
+尚未实现。这是一个脚手架占位符，描述意图中的形态，让项目结构保持连贯。
+见 docs/rfc.md（决策 3）和 docs/test.md（第 1 层）。
 """
 
 from __future__ import annotations
 
 
 class FlappyBirdGame:
-    """Deterministic fixed-timestep Flappy Bird physics.
+    """确定性的 fixed-timestep Flappy Bird 物理。
 
-    Intended interface (to be implemented):
-        - reset(seed) -> None         : start a fresh game
-        - step(flap: bool) -> None    : advance exactly one physics tick
-        - state                        : bird y, bird vy, next pipe x / gap_top / gap_bottom
-        - alive: bool                  : False once a collision or out-of-bounds occurs
-        - score: int                   : pipes cleared so far
+    意图中的接口（待实现）：
+        - reset(seed) -> None         : 开始一局全新的游戏
+        - step(flap: bool) -> None    : 精确推进一个物理 tick
+        - state                        : bird y、bird vy、next pipe x / gap_top / gap_bottom
+        - alive: bool                  : 一旦发生碰撞或越界即为 False
+        - score: int                   : 目前已过的管道数
 
-    The class knows nothing about observations, actions-as-ints, or reward. Those are the
-    env's job. Keeping this layer pure is what makes physics independently testable.
+    这个类对 observation、把 action 当成 int、reward 一无所知。那些是 env 的职责。
+    保持这一层纯粹，正是物理可以被独立测试的原因。
     """
 
     def __init__(self) -> None:
         raise NotImplementedError(
-            "FlappyBirdGame is a scaffold placeholder. See docs/rfc.md and docs/test.md."
+            "FlappyBirdGame 是脚手架占位符。见 docs/rfc.md 和 docs/test.md。"
         )

@@ -1,8 +1,8 @@
-"""Scaffold-stage tests.
+"""脚手架阶段的测试。
 
-These assert only that the package structure is importable and that the deferred components
-announce themselves as placeholders. Real per-layer tests (physics unit tests, env contract
-tests, training smoke test) are specified in docs/test.md and land with the implementation.
+这些测试只断言两件事：包结构可以被 import，以及被推迟的组件会把自己声明为占位符。
+真正的分层测试（physics 单元测试、env 契约测试、训练 smoke test）在 docs/test.md 中
+有规格说明，会随实现一起落地。
 """
 
 import flappy_rl
@@ -21,4 +21,4 @@ def test_components_are_deferred_placeholders():
             cls()
         except NotImplementedError:
             continue
-        raise AssertionError(f"{cls.__name__} should be a NotImplementedError placeholder")
+        raise AssertionError(f"{cls.__name__} 应当是一个 NotImplementedError 占位符")

@@ -1,29 +1,31 @@
-# Working Log
+# 工作日志
 
 ## Changelog
 
 ### 2026-06-20
 
-- Scaffolded the project: `docs/`, `src/flappy_rl/`, `scripts/`, `tests/`, `AGENTS.md`,
-  `.gitignore`, `.env.example`, `pyproject.toml`, `README.md`.
-- Wrote the documentation set: `prd.md` (goals + success criteria), `rfc.md` (architecture
-  and the four key decisions), `concepts.md` (the RL primer + reward design / reward hacking
-  catalog), `test.md` (per-layer verification meaning).
-- Recorded the central design decisions: internal-state Gymnasium env (not window control),
-  synchronous fixed-timestep loop (not async real-time), three decoupled layers, PPO by
-  default via Stable-Baselines3.
-- Left the reward function and the implementation deliberately unwritten — the reward design
-  is the next discussion, by design.
+- 搭好项目脚手架：`docs/`、`src/flappy_rl/`、`scripts/`、`tests/`、`AGENTS.md`、
+  `.gitignore`、`.env.example`、`pyproject.toml`、`README.md`。
+- 写好文档集：`prd.md`（目标 + 成功标准）、`rfc.md`（架构与四个关键决策）、
+  `concepts.md`（RL 入门 + reward 设计 / reward hacking 清单）、`test.md`（每一层
+  "已验证"的含义）。
+- 记录核心设计决策：内部状态的 Gymnasium env（而非窗口操控）、同步 fixed-timestep
+  循环（而非异步实时）、三个解耦的层、默认走 Stable-Baselines3 的 PPO。
+- 刻意把 reward 函数和实现留空——reward 设计是下一场讨论的内容，本就如此安排。
+- 把项目工作语言定为中文，并把已有的全部文档（concepts/prd/rfc/test/README/AGENTS/
+  working）和源码注释从英文改写为中文。技术术语（RL、policy、reward、PPO、DQN、
+  Gymnasium 等）保留英文。
 
 ## Lessons Learned
 
-- The original framing ("a game window + a programmatic control interface") is the wrong
-  path for an RL on a self-authored game: it forces pixels + input injection, the hardest
-  setting. Because we own the game, the correct interface is `reset()`/`step()` over the
-  internal numeric state. Don't reintroduce a window-control layer.
-- "Real-time vs turn-based" is a false binary. The loop is synchronous fixed-timestep; the
-  game is frozen between `step()` calls, so the agent never races the clock. Real-time is
-  only the rendering layer, opt-in and decoupled.
-- Reward is the whole specification. Log the *task metric* (pipes cleared) separately from
-  reward so reward hacking shows up as a divergence rather than hiding inside a nice-looking
-  reward curve. Watching rendered episodes is a debugging tool, not a demo.
+- 最初的设想（"一个游戏窗口 + 一套 programmatic 控制接口"）对于在自己编写的游戏上
+  做 RL 是错误的路线：它逼着你走 pixels + 输入注入，那是最难的设定。因为游戏是我们
+  自己的，正确的接口是对内部数值 state 做 `reset()`/`step()`。不要再把窗口操控这一层
+  加回来。
+- "实时 vs 回合制"是伪二分。这个循环是同步 fixed-timestep 的；游戏在两次 `step()`
+  之间是冻结的，所以 agent 永远不会和时钟赛跑。实时只属于渲染层，opt-in 且解耦。
+- reward 就是整份规格说明。把 task metric（过管数）与 reward 分开记录，这样 reward
+  hacking 会以背离的形式显现出来，而不是藏在一条好看的 reward 曲线里。观看渲染的
+  episode 是调试工具，不是演示。
+- 项目工作语言为中文。后续所有文档、注释、commit message 默认用中文；技术术语和代码
+  标识符保留英文。

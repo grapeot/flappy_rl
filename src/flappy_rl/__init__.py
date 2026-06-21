@@ -1,8 +1,8 @@
-"""flappy_rl — learning reinforcement learning via a self-authored Flappy Bird.
+"""flappy_rl —— 通过一个自己编写的 Flappy Bird 来学习 reinforcement learning。
 
-See docs/concepts.md for the conceptual frame and docs/rfc.md for the architecture.
-Implementation is scaffolded but deferred: the reward function in particular is left for a
-design discussion (see docs/concepts.md section 4).
+概念框架见 docs/concepts.md，架构见 docs/rfc.md。
+实现已搭好脚手架但被刻意推迟：尤其是 reward 函数，留给一次设计讨论
+（见 docs/concepts.md 第 4 节）。
 """
 
 __version__ = "0.1.0"

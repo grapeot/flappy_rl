@@ -1,131 +1,121 @@
-# RFC — Architecture & Key Decisions
+# RFC — 架构与关键决策
 
-This document records the architecture and the design decisions that shaped it. The
-conceptual RL background lives in [`concepts.md`](concepts.md); this file is about *how the
-code is structured and why*.
+本文档记录项目的架构，以及塑造这一架构的设计决策。RL 的概念性背景在
+[`concepts.md`](concepts.md) 中；本文关注的是*代码如何组织、以及为什么这样组织*。
 
-## The architecture in one diagram
+## 一图概览架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  scripts/train.py · scripts/play.py   (user entrypoints)     │
+│  scripts/train.py · scripts/play.py   (用户入口)            │
 └───────────────┬─────────────────────────────────────────────┘
-                │ uses
+                │ 使用
 ┌───────────────▼─────────────────────────────────────────────┐
-│  Stable-Baselines3  (PPO / DQN — the algorithm, off the shelf)│
+│  Stable-Baselines3  (PPO / DQN —— 算法本体，现成可用)        │
 └───────────────┬─────────────────────────────────────────────┘
-                │ drives via reset()/step()
+                │ 通过 reset()/step() 驱动
 ┌───────────────▼─────────────────────────────────────────────┐
-│  Layer 2:  FlappyBirdEnv  (gymnasium.Env wrapper)            │
-│    - observation vector, action space, REWARD function       │
-│    - optional render() → pygame  (human-only side path)      │
+│  Layer 2:  FlappyBirdEnv  (gymnasium.Env 封装)              │
+│    - observation 向量、action 空间、REWARD 函数            │
+│    - 可选 render() → pygame  (仅供人类观看的旁路)          │
 └───────────────┬─────────────────────────────────────────────┘
-                │ wraps
+                │ 封装
 ┌───────────────▼─────────────────────────────────────────────┐
-│  Layer 1:  FlappyBirdGame  (pure physics, no RL, no render)  │
-│    - bird y / vy, gravity, pipe spawning, collision          │
+│  Layer 1:  FlappyBirdGame  (纯物理，无 RL、无渲染)         │
+│    - bird y / vy、重力、管道生成、碰撞                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Everything runs in **one Python process**. There is no game window to "control," no
-screen-scraping, no simulated keypresses, no inter-process communication.
+一切都运行在**单个 Python 进程**中。没有需要"操控"的游戏窗口，没有屏幕抓取，没有
+模拟按键，也没有进程间通信。
 
-## Decision 1 — Internal state, not a window + control interface
+## 决策 1 —— 内部状态，而非"窗口 + 控制接口"
 
-The instinctive design is "make a real game window, give it an API, and have the program
-control it like a player." For RL on a game *you wrote yourself*, this is the wrong path.
+直觉上的设计是"做一个真实的游戏窗口，给它一套 API，再让程序像玩家那样去操控它"。
+对于在*你自己编写*的游戏上做 RL，这是错误的路线。
 
-Driving a window means screen-capture, image recognition, and OS-level input injection —
-the hardest RL setting (learn from pixels under real input latency). That setting only
-makes sense when you *cannot* reach the game's internal state, e.g. playing someone else's
-closed game.
+驱动一个窗口意味着屏幕截图、图像识别和操作系统级的输入注入 —— 这是最困难的 RL
+设定（在真实输入延迟下从像素中学习）。这种设定只有在你*无法*触及游戏内部状态时
+才有意义，比如玩别人写的、闭源的游戏。
 
-Here the game is ours, so the bird's height, velocity, and the next pipe's gap are just
-variables we can read. The RL algorithm doesn't want a picture of the window; it wants
-those numbers. So the right interface is not "control a window" but "expose a function you
-can `step()`" — which is exactly the Gymnasium contract:
+这里游戏是我们自己的，所以小鸟的高度、速度，以及下一根管道的缝隙，不过是我们能够
+读取的变量。RL 算法并不想要窗口的一张图片；它想要的是那些数字。因此正确的接口不是
+"操控一个窗口"，而是"暴露一个你可以 `step()` 的函数" —— 这恰好就是 Gymnasium 的
+契约：
 
 ```python
 obs, info = env.reset(seed=0)
 obs, reward, terminated, truncated, info = env.step(action)  # action ∈ {0: noop, 1: flap}
 ```
 
-Rendering a window is then a pure, optional, human-only output path — decoupled from
-learning, off during training, on when we want to watch.
+如此一来，渲染窗口就成为一条纯粹、可选、仅供人类观看的输出路径 —— 与学习解耦，
+训练时关闭，想观看时再打开。
 
-**Consequence:** the "Python backend vs real-time window" tension in the original framing
-dissolves. There is no second process and no real-time control channel to coordinate.
+**结果：** 原始设想中"Python 后端 vs 实时窗口"的张力随之消解。不存在第二个进程，
+也不存在需要协调的实时控制通道。
 
-## Decision 2 — Synchronous fixed-timestep loop, not async real-time
+## 决策 2 —— 同步的 fixed-timestep 循环，而非异步实时
 
-"Real-time vs turn-based" is a false binary here. The game is *conceptually* real-time (the
-bird falls whether or not you act), but every real-time game is, inside the machine, a
-sequence of discrete frames. We treat one frame as one decision point: flap this frame or
-not? So from the algorithm's view it is step-based — but a "step" is a fixed slice of
-physics time, not a turn that waits for an opponent.
+"实时 vs 回合制"在这里是一个伪二分。游戏在*概念上*是实时的（无论你是否操作，
+小鸟都会下落），但每一个实时游戏在机器内部都是一连串离散帧的序列。我们把一帧视为
+一个决策点：这一帧拍翅膀，还是不拍？所以从算法的视角看，它是 step-based 的 ——
+但一个"step"是物理时间的一个固定切片，而不是一个等待对手的回合。
 
-The key property: **the game is frozen between steps.** `env.step()` advances physics
-exactly one tick and returns; nothing moves until the agent calls again. The agent never
-"falls behind" the game — the game waits for the agent. (The latency worry — "the algorithm
-is too slow, the bird crashes before it decides" — only exists in the screen-control path,
-which is another reason we rejected it.)
+关键性质是：**游戏在两次 step 之间是冻结的。** `env.step()` 精确推进一个 tick
+的物理然后返回；在 agent 再次调用之前，什么都不动。agent 永远不会"落后"于游戏 ——
+是游戏在等待 agent。（那种延迟担忧 ——"算法太慢，小鸟在它决定之前就撞了" ——
+只存在于屏幕操控的路线里，这也是我们拒绝它的另一个理由。）
 
-Therefore:
+因此：
 
-- **Training:** run the loop with no `sleep` and no window, as fast as the CPU allows —
-  potentially tens of thousands of frames per second. Wall-clock realtime would just waste
-  cycles.
-- **Playing for humans:** run the *same* loop, but `sleep` to ~30 FPS and render. It looks
-  like a live game; the core is identical synchronous stepping.
+- **训练：** 不带 `sleep`、不带窗口地运行循环，以 CPU 允许的最快速度跑 ——
+  每秒可能达到数万帧。让墙钟时间保持实时只会白白浪费算力。
+- **供人类游玩：** 运行*同一个*循环，但用 `sleep` 限制到约 30 FPS 并渲染。它看起来
+  像一个实时游戏；其内核是完全相同的同步 stepping。
 
-Same loop; the only difference is whether we sleep and draw.
+同一个循环；唯一的差别是我们是否 sleep 和绘制。
 
-## Decision 3 — Three decoupled layers
+## 决策 3 —— 三个解耦的层
 
-- **Layer 1 `FlappyBirdGame` (physics):** owns bird position/velocity, gravity, flap
-  impulse, pipe spawning and motion, collision and scoring. Knows nothing about RL or
-  rendering. Deterministic given a seed. Independently testable by stepping it by hand and
-  asserting on coordinates.
-- **Layer 2 `FlappyBirdEnv` (gymnasium.Env):** translates physics into the RL contract —
-  defines the observation vector, the discrete action space, and **the reward function**
-  (the one piece we are deliberately deferring to a design discussion). Owns the optional
-  `render()`.
-- **Layer 3 training/eval:** thin scripts that hand the env to Stable-Baselines3.
+- **Layer 1 `FlappyBirdGame`（物理）：** 拥有小鸟的位置/速度、重力、拍翅冲量、
+  管道的生成与移动、碰撞和计分。对 RL 和渲染一无所知。给定 seed 即为确定性。可以
+  通过手动 step 它并对坐标做断言来独立测试。
+- **Layer 2 `FlappyBirdEnv`（gymnasium.Env）：** 把物理翻译成 RL 契约 ——
+  定义 observation 向量、离散 action 空间，以及 **reward 函数**（我们刻意留到设计
+  讨论中的那一块）。拥有可选的 `render()`。
+- **Layer 3 训练/评估：** 把 env 交给 Stable-Baselines3 的轻薄脚本。
 
-This separation is what makes the project a good teaching artifact: reward design changes
-touch only Layer 2; algorithm changes touch only Layer 3; physics stays put and trusted.
+正是这种分离让本项目成为一个好的教学样本：reward 设计的改动只触及 Layer 2；算法
+的改动只触及 Layer 3；物理保持原位、值得信赖。
 
-## Decision 4 — Algorithm: PPO by default, DQN available
+## 决策 4 —— 算法：默认 PPO，DQN 可选
 
-Both fit a two-action, low-dimensional, dense-reward problem. We default to **PPO** because
-it is robust to hyperparameters and is the current industry default — it lets us spend our
-attention on the environment and reward rather than on babysitting exploration schedules.
-**DQN** stays available as a one-line swap, partly because contrasting the two (value-based
-vs policy-gradient) is itself instructive. We do not implement either; Stable-Baselines3
-provides both. Rationale and trade-offs are in [`concepts.md`](concepts.md).
+两者都适用于一个双 action、低维、dense-reward 的问题。我们默认选 **PPO**，因为它
+对超参数鲁棒，且是当前行业默认 —— 它让我们把注意力花在 environment 和 reward 上，
+而不是花在照看探索调度上。**DQN** 作为一行代码即可切换的选项保留下来，部分原因是
+对比这两者（value-based vs policy-gradient）本身就很有启发性。我们不自己实现任何
+一个；Stable-Baselines3 两者都提供。理由与权衡见 [`concepts.md`](concepts.md)。
 
-## Decision 5 — Compact numeric observation, not pixels (for v0)
+## 决策 5 —— 紧凑的数值 observation，而非像素（v0 阶段）
 
-The observation is a small vector — bird height, vertical velocity, horizontal distance to
-the next pipe, and that pipe's gap edges. Relative/normalized coordinates are preferred over
-raw ones so the policy generalizes across the screen. This learns in minutes with an MLP
-policy. Pixel input (CNN policy) is a documented future extension, deliberately out of v0
-scope for cost and focus reasons.
+observation 是一个小向量 —— 小鸟高度、垂直速度、到下一根管道的水平距离，以及那根
+管道缝隙的边缘。相对/归一化坐标优于原始坐标，这样 policy 能在屏幕各处泛化。用一个
+MLP policy，它能在几分钟内学会。像素输入（CNN policy）是一个有文档记录的未来扩展，
+出于成本与聚焦的考虑被刻意排除在 v0 范围之外。
 
-## Tech stack
+## 技术栈
 
-- Python 3.11+, managed with `uv` in a local `.venv`.
-- `gymnasium` for the env contract.
-- `stable-baselines3` (+ `torch`) for PPO/DQN.
-- `pygame` for the optional renderer only.
-- `pytest` for tests; `ruff` for lint.
+- Python 3.11+，用 `uv` 在本地 `.venv` 中管理。
+- `gymnasium` 提供 env 契约。
+- `stable-baselines3`（+ `torch`）提供 PPO/DQN。
+- `pygame` 仅用于可选的渲染器。
+- `pytest` 做测试；`ruff` 做 lint。
 
-## Open questions (for the upcoming reward discussion)
+## 待解问题（留给即将到来的 reward 讨论）
 
-1. Reward shape: sparse (only on pipe-clear / death) vs shaped (per-frame survival, gap
-   proximity bonus). Trade-off: learning speed vs reward-hacking surface.
-2. Observation design: raw vs relative coordinates; how many pipes ahead to expose.
-3. Episode termination and any truncation cap (to stop a "perfect" bird from running
-   forever during eval).
+1. Reward 形态：sparse（仅在过管/死亡时给）vs shaped（每帧存活、接近缝隙的奖励）。
+   权衡：学习速度 vs reward-hacking 的暴露面。
+2. Observation 设计：原始坐标 vs 相对坐标；向前暴露多少根管道。
+3. Episode 终止，以及任何 truncation 上限（防止一只"完美"的小鸟在评估时永远跑下去）。
 
-These are intentionally unresolved here — they are the substance of the next conversation.
+这些在此处被刻意悬而未决 —— 它们正是下一场对话的实质内容。

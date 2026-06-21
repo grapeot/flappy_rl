@@ -1,35 +1,34 @@
-"""Layer 2 — Gymnasium environment wrapping the physics core.
+"""Layer 2 —— 封装物理内核的 Gymnasium environment。
 
-This module translates FlappyBirdGame (game.py) into the standard RL contract that
-Stable-Baselines3 consumes: reset()/step(), an observation space, a Discrete(2) action
-space, and — crucially — the REWARD function.
+本模块把 FlappyBirdGame（game.py）翻译成 Stable-Baselines3 所消费的标准 RL 契约：
+reset()/step()、一个 observation space、一个 Discrete(2) 的 action space，以及——
+至关重要的——REWARD 函数。
 
-NOT YET IMPLEMENTED. The reward function is deliberately deferred to a design discussion;
-see docs/concepts.md section 4 (reward design + reward hacking) for the trade-offs we will
-decide on before writing it. This file is a scaffold placeholder.
+尚未实现。reward 函数被刻意推迟到一次设计讨论；其中的取舍见 docs/concepts.md 第 4 节
+（reward design + reward hacking），我们会在写它之前先把这些定下来。本文件是脚手架占位符。
 """
 
 from __future__ import annotations
 
 
 class FlappyBirdEnv:
-    """gymnasium.Env wrapper around FlappyBirdGame.
+    """围绕 FlappyBirdGame 的 gymnasium.Env 封装。
 
-    Intended interface (to be implemented):
-        - observation_space : Box of normalized [bird_y, bird_vy, dx_to_pipe, gap_top,
-                              gap_bottom] (exact design is an open question — see rfc.md)
+    意图中的接口（待实现）：
+        - observation_space : 归一化的 [bird_y, bird_vy, dx_to_pipe, gap_top,
+                              gap_bottom] 的 Box（确切设计是一个待解问题——见 rfc.md）
         - action_space      : Discrete(2)  # 0 = noop, 1 = flap
         - reset(seed) -> (obs, info)
         - step(action) -> (obs, reward, terminated, truncated, info)
-        - render()          : optional pygame window — human-only, decoupled from training
+        - render()          : 可选的 pygame 窗口——仅供人类观看，与训练解耦
 
-    DESIGN HOLD: the reward computation inside step() is intentionally unwritten. Designing
-    it is the next conversation. When implemented, log the task metric (pipes cleared) into
-    `info` separately from reward so reward hacking is visible (see docs/concepts.md).
+    DESIGN HOLD（设计悬置）：step() 内部的 reward 计算被刻意留空。设计它是下一场对话。
+    实现时，把 task metric（过管数）和 reward 分开记进 `info`，让 reward hacking 可见
+    （见 docs/concepts.md）。
     """
 
     def __init__(self) -> None:
         raise NotImplementedError(
-            "FlappyBirdEnv is a scaffold placeholder; reward design is deferred. "
-            "See docs/concepts.md section 4."
+            "FlappyBirdEnv 是脚手架占位符；reward 设计被推迟。"
+            "见 docs/concepts.md 第 4 节。"
         )

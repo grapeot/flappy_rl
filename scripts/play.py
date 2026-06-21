@@ -1,16 +1,16 @@
-"""Load a trained policy and play episodes; optionally render a real-time window.
+"""加载一个训练好的 policy 并游玩若干 episode；可选地渲染一个实时窗口。
 
-Uses the SAME synchronous loop as training, but sleeps to ~30 FPS and draws when --render
-is passed (see docs/rfc.md Decision 2). Reports the task metric (pipes cleared) per episode.
-Watching rendered episodes is a debugging tool for spotting reward hacking (docs/test.md).
+使用与训练*相同*的同步循环，但在传入 --render 时 sleep 到约 30 FPS 并绘制
+（见 docs/rfc.md 决策 2）。每个 episode 报告 task metric（过管数）。观看渲染的
+episode 是发现 reward hacking 的调试工具（docs/test.md）。
 
-NOT YET IMPLEMENTED; scaffold placeholder.
+尚未实现；脚手架占位符。
 """
 
 
 def main() -> None:
     raise SystemExit(
-        "play.py is a scaffold placeholder. Implementation is deferred — see docs/working.md."
+        "play.py 是脚手架占位符。实现被推迟——见 docs/working.md。"
     )
 
 

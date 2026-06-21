@@ -1,121 +1,107 @@
-# RL Concepts, grounded in Flappy Bird
+# RL 概念，扎根于 Flappy Bird
 
-This is the conceptual core of the project. It explains the ideas you came here to
-understand — policy, the training loop, the algorithm families, and especially **reward
-design and reward hacking** — using this one concrete game so the abstractions stay
-attached to something real.
+这是本项目的概念核心。它用 Flappy Bird 这一个具体游戏，解释你真正想理解的那些想法——
+policy、训练循环、算法家族，尤其是 **reward design（奖励设计）与 reward hacking**——
+让抽象始终挂靠在一个真实的东西上。
 
-It assumes you don't want to hand-write the algorithms. So it stays at the level of *what
-each piece is and why it's shaped that way*, not the gradient math.
-
----
-
-## 1. The loop: what reinforcement learning actually is
-
-RL is learning by interaction. There is an **agent** and an **environment**. On each step:
-
-1. The environment shows the agent a **state** (here: bird height, velocity, next pipe's
-   gap).
-2. The agent picks an **action** (flap or don't).
-3. The environment moves one tick forward and returns a **reward** (a single number) and
-   the next state.
-
-The agent's whole job is to choose actions that maximize **cumulative reward over time**,
-not the immediate reward. This "over time" is the heart of it: flapping now might cost a
-little but save the bird from a wall three frames later. The agent has to learn to value
-future consequences of present actions. That delayed-credit problem — "which of my past
-actions caused this reward?" — is what makes RL different from ordinary supervised learning,
-where each input has a known correct label. In RL nobody tells the bird the right move;
-it only finds out, much later and noisily, whether things went well.
-
-A few terms you'll meet:
-
-- **Episode**: one playthrough from `reset()` to death (or a truncation cap). The bird
-  flapping until it hits a pipe is one episode.
-- **Return**: the total (usually discounted) reward across an episode. This is the thing
-  being maximized.
-- **Discount factor (γ, gamma)**: a number near 1 (e.g. 0.99) that makes near-future
-  reward worth slightly more than far-future reward. It keeps the math stable and encodes
-  "sooner is a bit better." With γ = 0.99, a reward 100 steps away is worth about
-  0.99^100 ≈ 0.37 of its face value now.
+本文假设你并不想手写算法，所以它停留在*每个部件是什么、为什么是这个形态*的层面，
+而不展开梯度数学。
 
 ---
 
-## 2. What a policy *is*, and what it looks like
+## 1. 这个循环：reinforcement learning 究竟是什么
 
-A **policy** (written π) is the agent's strategy: a function from state to action. It is
-the thing being learned. Everything else in RL is machinery for improving the policy.
+RL 是通过交互来学习。场景里有一个 **agent** 和一个 **environment**。每一步：
 
-Concretely in this project the policy is a small neural network (an MLP). Its input is the
-observation vector; its output describes what to do:
+1. environment 给 agent 看一个 **state**（这里是：小鸟高度、速度、下一根管道的缝隙）。
+2. agent 选一个 **action**（拍翅膀或不拍）。
+3. environment 向前推进一个 tick，返回一个 **reward**（一个数字）和下一个 state。
 
-- In a **policy-gradient** method like PPO, the network outputs a *probability* for each
-  action — e.g. "flap with probability 0.2, don't-flap with probability 0.8" — and we
-  sample from that. Outputting probabilities (a *stochastic* policy) is what lets the agent
-  explore: early on the probabilities are near 50/50 and it tries everything; as it learns,
-  they sharpen toward good moves.
-- In a **value-based** method like DQN, the network instead outputs a *value* for each
-  action — "the long-run payoff of flapping here is 8.3, of not flapping is 9.1" — and the
-  policy is the trivial rule "pick the higher one."
+agent 的全部任务，是选出能最大化**长期累积 reward** 的 action，而不是最大化眼前这一下的
+reward。这个"长期"是它的核心：现在拍一下翅膀也许有点小代价，却能让小鸟在三帧之后不撞墙。
+agent 必须学会为当下行为的未来后果赋值。这个延迟信用分配问题——"我过去哪一步行为
+导致了这次 reward？"——正是 RL 区别于普通监督学习的地方：在监督学习里每个输入都有一个
+已知的正确标签，而 RL 里没人告诉小鸟正确的一步是什么，它只能在很久以后、带着噪声地，
+发现事情到底是不是变好了。
 
-So "what does a policy look like" has a very concrete answer here: it's a few small weight
-matrices that turn five-ish numbers into two numbers. After training you can save it, load
-it, and call it on any state to get a move. That saved file *is* the learned skill.
+会遇到的几个术语：
 
-A useful distinction:
-
-- **Policy** = state → action (what to do).
-- **Value function** = state (or state+action) → expected return (how good it is to be
-  here, or to do this here). Value is a *prediction*; policy is a *decision*. Some
-  algorithms learn only a policy, some only a value function, and some (like PPO,
-  "actor-critic") learn both at once — the value function ("critic") is used to judge and
-  improve the policy ("actor").
+- **Episode（回合）**：从 `reset()` 到死亡（或到一个 truncation 截断上限）的一次完整
+  游玩。小鸟一直拍到撞上管道，就是一个 episode。
+- **Return（回报）**：一个 episode 内 reward 的总和（通常带折扣）。这正是被最大化的东西。
+- **Discount factor（折扣因子 γ, gamma）**：一个接近 1 的数（例如 0.99），让近期的
+  reward 比远期的略值钱一点。它让数学保持稳定，并编码了"早一点更好一点"。当 γ = 0.99 时，
+  100 步之后的一份 reward，在当下约值它面值的 0.99^100 ≈ 0.37。
 
 ---
 
-## 3. The two algorithm families, and why we pick PPO
+## 2. policy *是什么*，它长什么样
 
-You don't need to implement these, but choosing between them and reading their logs
-requires knowing what they are.
+**policy（策略，记作 π）** 是 agent 的策略：一个从 state 到 action 的函数。它就是被学习的
+那个东西。RL 里其余的一切，都是为了改进 policy 的机器。
 
-### Value-based: DQN (Deep Q-Network)
+在本项目里，policy 具体是一个小神经网络（一个 MLP）。它的输入是 observation 向量；
+它的输出描述该做什么：
 
-Learns a **Q-function**: Q(state, action) = expected long-run return of taking that action
-in that state and behaving well afterward. The policy is "take the action with the highest
-Q." It learns by **bootstrapping** — updating its estimate of one state toward the reward
-plus its own estimate of the next state (this is the famous Bellman update).
+- 在 PPO 这样的 **policy-gradient** 方法里，网络为每个 action 输出一个*概率*——例如
+  "以 0.2 的概率拍，以 0.8 的概率不拍"——然后我们从中采样。输出概率（即一个*随机性
+  stochastic* 的 policy）正是让 agent 得以探索的机制：早期概率接近 50/50，它什么都试；
+  随着学习推进，概率逐渐向好的动作收紧。
+- 在 DQN 这样的 **value-based** 方法里，网络转而为每个 action 输出一个*价值 value*——
+  "在这里拍的长期收益是 8.3，不拍是 9.1"——而 policy 就是那条平凡的规则"选更高的那个"。
 
-Strengths: sample-efficient, because it uses a **replay buffer** — past experience is stored
-and reused many times. Natural fit for small discrete action sets (we have exactly two).
+所以"policy 长什么样"在这里有一个非常具体的答案：它是几个小权重矩阵，把五个左右的数字
+变成两个数字。训练完之后，你可以保存它、加载它，对任意 state 调用它来得到一步动作。
+那个保存下来的文件*就是*学到的技能本身。
 
-Costs: several moving parts that can be finicky — an **ε-greedy** exploration schedule (act
-randomly ε of the time, decay ε over training), a **target network** (a lagged copy used to
-stabilize the bootstrap), and the replay buffer. Misconfigure these and it silently fails to
-learn.
+一个有用的区分：
 
-### Policy-gradient: PPO (Proximal Policy Optimization)
+- **Policy** = state → action（该做什么）。
+- **Value function（价值函数）** = state（或 state+action）→ 期望 return（处在这里、
+  或在这里做这件事，有多好）。value 是一个*预测*；policy 是一个*决策*。有些算法只学
+  policy，有些只学 value function，还有一些（如 PPO，"actor-critic"）同时学两者——
+  value function（"critic"，评论家）被用来评判并改进 policy（"actor"，行动者）。
 
-Learns the policy **directly**: it runs the current policy, sees which actions led to
-higher-than-expected return, and nudges the network to make those actions more likely —
-while *clipping* each update so the policy can't lurch too far in one step (that clipping is
-the "proximal" part, and it's what makes PPO stable).
+---
 
-Strengths: robust, forgiving of hyperparameters, the current default across the industry.
-Built-in exploration via the stochastic policy — no separate ε schedule to tune.
+## 3. 两大算法家族，以及我们为什么选 PPO
 
-Costs: **on-policy**, so it cannot reuse old experience the way DQN's replay buffer does;
-it needs more environment steps. But Flappy Bird simulates extremely fast headless, so this
-cost is irrelevant for us.
+你不需要去实现它们，但要在两者间做选择、要读懂它们的日志，就得知道它们是什么。
 
-### Decision
+### Value-based：DQN（Deep Q-Network）
 
-**PPO by default.** For a project whose point is to understand RL and reward design, PPO's
-forgiveness means the bird actually learns without algorithm babysitting, so our attention
-goes where it should — to the environment and the reward. DQN stays one line away, and
-running both is a good exercise precisely because it makes the value-vs-policy distinction
-tangible.
+学习一个 **Q-function**：Q(state, action) = 在该 state 下采取该 action、并在之后表现良好时
+所能得到的期望长期 return。policy 就是"采取 Q 最高的那个 action"。它通过 **bootstrapping
+（自举）** 来学习——把对某个 state 的估计，朝着"reward 加上它自己对下一个 state 的估计"
+去更新（这就是著名的 Bellman 更新）。
 
-With Stable-Baselines3 the entire algorithm side is roughly:
+优点：sample-efficient（样本高效），因为它用了一个 **replay buffer（经验回放池）**——
+过去的经验被存下来反复利用多次。天然契合小的离散动作集（我们正好两个动作）。
+
+代价：几个可能很挑剔的活动部件——一个 **ε-greedy** 探索调度（以 ε 的概率随机行动，
+并在训练中衰减 ε）、一个 **target network（目标网络，用一份滞后的拷贝来稳定自举）**，
+以及那个 replay buffer。这些配错了，它会悄无声息地学不会。
+
+### Policy-gradient：PPO（Proximal Policy Optimization）
+
+**直接**学习 policy：它运行当前 policy，看哪些 action 带来了高于预期的 return，然后轻推
+网络让那些 action 更可能发生——同时对每次更新做*裁剪 clipping*，使 policy 在一步之内
+不会跳得太远（这个裁剪就是"proximal"的含义，也正是 PPO 稳定的原因）。
+
+优点：鲁棒，对超参数宽容，是当前行业默认。通过随机性 policy 自带探索——没有单独的
+ε 调度需要调。
+
+代价：**on-policy（同策略）**，所以它无法像 DQN 的 replay buffer 那样复用旧经验；它需要
+更多的 environment 步数。但 Flappy Bird 在 headless 下模拟极快，这个代价对我们而言无关紧要。
+
+### 决策
+
+**默认 PPO。** 对于一个以理解 RL 和 reward 设计为目的的项目，PPO 的宽容意味着小鸟真的能
+学会、不需要照看算法本身，于是我们的注意力可以落到它该落的地方——environment 和 reward。
+DQN 作为一行代码即可切换的选项保留下来，而且跑一跑两者本身就是个好练习，因为它把
+value-vs-policy 的区别变得可触可感。
+
+用 Stable-Baselines3，整个算法这一侧大致就是：
 
 ```python
 from stable_baselines3 import PPO
@@ -124,152 +110,131 @@ model.learn(total_timesteps=500_000)
 model.save("flappy_ppo")
 ```
 
-That brevity is the point: the library is solved infrastructure. The interesting,
-project-specific, easy-to-get-wrong work is everything below.
+这种简短正是重点：库是已经解决好的基础设施。有意思的、项目特有的、容易做错的工作，
+全在下面。
 
 ---
 
-## 4. Reward design — the part that actually decides success
+## 4. reward design——真正决定成败的那部分
 
-The reward function is the only place you tell the agent *what you want*. It is also where
-almost all real RL pain lives, because the agent optimizes **exactly what you wrote, not
-what you meant**. This section is the heart of the doc.
+reward 函数是你唯一能告诉 agent *你想要什么*的地方。它也是几乎所有真实 RL 痛苦的所在，
+因为 agent 优化的是**你确切写下的东西，而不是你想表达的东西**。这一节是全文的核心。
 
-### The fundamental tension: sparse vs shaped
+### 根本性的张力：sparse vs shaped
 
-**Sparse reward**: only signal at meaningful events. For Flappy Bird, e.g. `+1` when the
-bird clears a pipe, `0` otherwise, and the episode ends on death.
+**Sparse reward（稀疏奖励）**：只在有意义的事件上给信号。对 Flappy Bird 来说，例如过一根
+管道时 `+1`，其余时刻 `0`，死亡时 episode 结束。
 
-- *Pro:* it expresses the true objective with no distortion. "Clear pipes" — nothing else.
-- *Con:* it's hard to learn from. A fresh, randomly-flapping bird almost never clears a
-  pipe, so it almost never sees a reward, so it has almost nothing to learn from. This is
-  the **exploration problem** — far-apart reward signals leave long stretches of "no
-  feedback," and learning crawls or stalls.
+- *优点：* 它毫无扭曲地表达了真实目标。"过管道"——别的什么都不是。
+- *缺点：* 很难从中学习。一只全新的、随机拍翅膀的小鸟几乎永远过不了一根管道，于是它
+  几乎从不看到 reward，于是它几乎没有任何东西可学。这就是**探索问题（exploration
+  problem）**——相距甚远的 reward 信号留下了长段长段的"没有反馈"，学习因此爬行甚至停滞。
 
-**Shaped reward**: add intermediate hints that point toward the goal. E.g. a small `+0.1`
-per frame survived, plus a bonus for being vertically aligned with the next gap.
+**Shaped reward（塑形奖励）**：加入指向目标的中间提示。例如每存活一帧给一个小小的 `+0.1`，
+再加上一个"与下一个缝隙垂直对齐"的奖励。
 
-- *Pro:* dense feedback — every single frame says something — so learning is much faster.
-- *Con:* every hint you add is a new surface for the agent to **game**. You are no longer
-  rewarding "play the game well"; you are rewarding a *proxy* for it, and proxies leak.
+- *优点：* 反馈稠密——每一帧都在说点什么——于是学习快得多。
+- *缺点：* 你加的每一个提示，都是 agent 可以**钻空子**的新表面。你不再是在奖励"把游戏
+  玩好"了；你是在奖励它的一个*代理指标 proxy*，而代理指标会泄漏。
 
-Reward shaping is the craft of adding just enough guidance to make learning tractable
-without changing what the optimal behavior actually is. There's even a formal safe version
-(*potential-based shaping*) that provably doesn't change the optimal policy — worth knowing
-exists, because most naive shaping does *not* have that guarantee.
+reward shaping 是一门手艺：加入恰好足够的引导，让学习变得可行，又不改变最优行为本身。
+甚至有一种形式化的安全版本（*potential-based shaping，基于势能的塑形*）可以被证明不改变
+最优 policy——值得知道它的存在，因为大多数朴素的 shaping 并*没有*这个保证。
 
-### A concrete catalog of pitfalls (all real in this game)
+### 一份具体的陷阱清单（在这个游戏里都真实存在）
 
-These are the failure modes we expect to actually hit, with the mechanism named:
+这些是我们预期真的会撞上的失效模式，并点出其机制：
 
-1. **Survival reward with no progress requirement.** Pay `+0.1` per frame alive, and the
-   bird may discover that *hovering* — never advancing past a pipe but never dying — racks
-   up reward forever. You rewarded "stay alive," and it found a way to stay alive that has
-   nothing to do with playing. (Mitigation: tie reward to pipes cleared, or cap episode
-   length, or make standing still impossible in the physics.)
+1. **不要求进展的存活奖励。** 每存活一帧给 `+0.1`，小鸟可能会发现*悬停*——永远不越过
+   一根管道、却也永远不死——能无限堆 reward。你奖励的是"活着"，而它找到了一种与玩游戏
+   毫无关系的活法。（缓解：把 reward 绑定到过管数上，或给 episode 长度设上限，或在 physics
+   里让原地不动变得不可能。）
 
-2. **Reward scale mismatch.** If "clear a pipe" is worth `+1` but "die" is worth `0` and
-   each survived frame is `+0.1`, then surviving 10 idle frames already outweighs the value
-   of clearing a pipe. The agent does the arithmetic you actually wrote, not the priorities
-   you intended. Relative magnitudes *are* the specification. (Mitigation: make the death
-   penalty and pipe reward dominate the per-frame term; sanity-check the numbers by hand.)
+2. **Reward 量级失配。** 如果"过一根管道"值 `+1`，而"死亡"值 `0`，每存活一帧值 `+0.1`，
+   那么干等 10 帧的收益就已经盖过了过一根管道的价值。agent 做的是你确切写下的算术，
+   不是你心里那套优先级。相对量级*就是*规格说明本身。（缓解：让死亡 penalty 和过管 reward
+   主导每帧那一项；用手算把这些数字做一遍 sanity check。）
 
-3. **Dense bonus that the agent over-optimizes.** Reward "vertical alignment with the gap"
-   and the bird may learn to sit perfectly centered while drifting into the pipe wall,
-   because at the instant of impact it was beautifully aligned and collected the bonus.
-   The proxy (alignment) and the goal (passage) came apart. (Mitigation: only reward
-   alignment *and* forward progress jointly, or only reward the actual pipe-clear event.)
+3. **被 agent 过度优化的稠密奖励。** 奖励"与缝隙垂直对齐"，小鸟可能学会完美地居中坐着、
+   同时径直飘进管道壁里，因为在撞击的那一瞬间它对得漂漂亮亮、把奖励收了。代理指标（对齐）
+   和目标（穿过去）就此分了家。（缓解：只在对齐*且*有向前进展时联合奖励，或者干脆只奖励
+   真正的过管事件。）
 
-4. **Unintended termination incentives.** If dying ends the episode and the per-step reward
-   is *negative* (say a small penalty per frame), a naive agent can conclude that the
-   fastest way to stop losing points is to **die immediately**. You meant "hurry"; it heard
-   "an early death is a good death." (Mitigation: ensure the value of continuing always
-   exceeds the value of dying — keep the death penalty larger than any accumulated step
-   cost.)
+4. **意料之外的终止激励。** 如果死亡会结束 episode，而每步 reward 是*负的*（比方说每帧
+   一个小 penalty），一个朴素的 agent 可能得出结论：止损最快的办法是**立刻去死**。你想说的
+   是"快一点"；它听到的是"早死早超生"。（缓解：确保"继续下去"的价值始终高于"去死"的价值——
+   让死亡 penalty 大于任何累积起来的每步代价。）
 
-5. **Distributional / boundary exploits.** The agent finds a corner of the state space the
-   physics handles oddly — clipping through a pipe edge, exploiting a spawn pattern, riding
-   the ceiling. The reward didn't forbid it because you didn't imagine it. (Mitigation:
-   harden the physics; randomize spawns and seeds; watch for "too good to be true" scores.)
+5. **分布 / 边界漏洞。** agent 找到了 state 空间里一个 physics 处理得很怪的角落——从管道
+   边缘穿模、利用某种生成模式、贴着天花板飞。reward 没禁止它，只因为你没想到它。（缓解：
+   把 physics 做硬；随机化生成和 seed；对"好得不真实"的分数保持警觉。）
 
-The throughline: **the agent is a literal-minded optimizer with no common sense and infinite
-patience.** Any gap between what you measured and what you wanted, it will find and walk
-through. Reward design is the discipline of closing those gaps before the agent finds them
-— and of recognizing, when the score looks suspiciously great, that it probably found one
-you missed.
+贯穿始终的一条：**agent 是一个不带常识、却有无限耐心的字面意义优化器。** 你所测量的
+和你所想要的之间的任何缝隙，它都会找到并钻过去。reward 设计这门功夫，就是在 agent 找到
+那些缝隙之前把它们堵上——以及在分数看起来好得可疑时，意识到它八成是找到了一条你没堵上的缝。
 
-### Reward hacking, stated plainly
+### 把 reward hacking 说清楚
 
-**Reward hacking** is when the agent achieves high reward *without* achieving the goal you
-designed the reward to represent — it optimizes the letter of the reward against its spirit.
-Every pitfall above is a flavor of it. It is not the agent being clever or adversarial; it
-is the agent doing exactly its job (maximize the number) on a number that imperfectly
-encodes your intent.
+**reward hacking（奖励作弊）** 是指 agent 拿到了高 reward，却*没有*达成你设计这个 reward
+本想代表的目标——它把 reward 的字面意思拿来对抗 reward 的精神。上面每一个陷阱都是它的一种
+变体。这不是 agent 在耍聪明或搞对抗；这是 agent 在一个不完美地编码了你意图的数字上，
+不折不扣地做它的本职工作（把那个数字最大化）。
 
-How to *recognize* it:
+如何*识别*它：
 
-- The reward curve goes up but the **behavior you actually care about** doesn't (pipes
-  cleared stays flat while reward climbs). This is why you log *task metrics separately
-  from reward* — reward is what you optimized, the task metric is what you wanted, and
-  watching them diverge is the tell.
-- The score is implausibly high, or the policy looks visually degenerate (hovering, wall-
-  hugging, suicide).
+- reward 曲线在涨，但**你真正在乎的行为**没涨（过管数原地不动，reward 却往上爬）。
+  这正是你要把 *task metric（任务指标）和 reward 分开记录*的原因——reward 是你优化的东西，
+  task metric 是你想要的东西，而看着它俩背离，就是那个破绽。
+- 分数高得不合常理，或者 policy 在视觉上看起来很退化（悬停、贴墙、自杀）。
 
-How to *prevent / reduce* it:
+如何*防止 / 减少*它：
 
-- **Reward the true objective as directly as you can tolerate.** The closer the reward is to
-  "cleared a pipe," the less room for proxies to leak. Add shaping only when sparse learning
-  genuinely stalls, and add the *least* you can.
-- **Keep magnitudes honest.** The relative sizes of survival / progress / death encode your
-  priorities; get them wrong and you've mis-specified the goal regardless of intent.
-- **Watch behavior, not just curves.** Render episodes periodically. A number can't tell you
-  the bird is cheating; your eyes can.
-- **Measure the goal metric independently** of the reward, and trust *it* as ground truth.
-- **Iterate.** First reward is a hypothesis. You will watch it fail, diagnose which pitfall
-  it hit, and revise. That loop is not a detour around the learning — for this project, that
-  loop *is* the learning.
+- **在你能容忍的范围内，尽可能直接地奖励真实目标。** reward 越贴近"过了一根管道"，
+  代理指标能泄漏的空间就越小。只在稀疏学习真的停滞时才加 shaping，而且加*最少*的那一点。
+- **让量级保持诚实。** 存活 / 进展 / 死亡之间的相对大小，编码了你的优先级；把它们搞错，
+  无论你本意如何，你都把目标给写错了。
+- **看行为，别只看曲线。** 周期性地渲染 episode。一个数字没法告诉你小鸟在作弊，你的眼睛能。
+- **独立于 reward 去度量目标指标**，并把*它*当作 ground truth 来信任。
+- **迭代。** 第一版 reward 是一个假设。你会看着它失败、诊断出它撞上了哪个陷阱、然后修订。
+  这个循环不是绕开学习的弯路——对这个项目而言，这个循环*就是*学习本身。
 
-This is exactly why the reward function is left unwritten in the code so far: we want to
-design it together, deliberately, with these failure modes in view — and very possibly to
-watch a first version get hacked, name which pitfall it was, and fix it. That is the most
-instructive thing this project can do.
+这正是为什么 reward 函数到目前为止被留在代码里没写：我们想一起、有意识地、把这些失效模式
+摆在眼前去设计它——而且很可能去看着第一版被 hack 掉、点出它是哪个陷阱、再把它修好。
+那是这个项目能做的最有教育意义的事。
 
 ---
 
-## 5. How this lands in practice (the engineering, briefly)
+## 5. 这一切如何在实践中落地（简述工程部分）
 
-Concepts only become real through a working harness. The practical pieces:
+概念只有通过一套能跑起来的脚手架才变得真实。实践中的几个部件：
 
-- **The env contract** (`reset` / `step`, observation space, action space, reward) is the
-  one interface everything else plugs into. Get it right and you can swap algorithms freely.
-- **Headless, faster-than-real-time training**: no rendering, no sleeping. Seconds of
-  wall-clock buy thousands of episodes.
-- **Evaluation separate from training**: run the frozen policy on fresh seeds and report the
-  *task metric* (mean pipes cleared) over a batch — never judge by training reward alone.
-- **Logging both reward and task metric**, so reward hacking shows up as a divergence rather
-  than hiding as a happy-looking reward curve.
-- **Watching with your eyes**: the optional renderer is not a toy — it is a debugging tool.
-  Many reward bugs are invisible in metrics and obvious on screen in two seconds.
-- **Reproducibility**: seed the env, the algorithm, and the framework so a result can be
-  re-run.
+- **env 契约**（`reset` / `step`、observation space、action space、reward）是其余一切
+  接入的那一个接口。把它弄对，你就能自由地替换算法。
+- **Headless、快于实时的训练**：不渲染、不 sleep。几秒钟的墙钟时间能买来数千个 episode。
+- **评估与训练分离**：在新的 seed 上运行被冻结的 policy，并在一批上报告 *task metric*
+  （平均过管数）——绝不只凭训练 reward 下判断。
+- **同时记录 reward 和 task metric**，这样 reward hacking 会以一种背离的形式显现出来，
+  而不是藏在一条看起来很美好的 reward 曲线里。
+- **用眼睛看**：可选的 renderer 不是玩具——它是一个调试工具。许多 reward bug 在 metrics
+  里隐形，在屏幕上两秒钟就一目了然。
+- **可复现性**：给 env、算法和框架都设 seed，这样一个结果可以被重新跑出来。
 
-The gap between "the reward curve went up" and "the bird plays the game" is precisely where
-RL practice lives, and it's the gap this project is built to let you feel directly.
+"reward 曲线涨上去了"和"小鸟会玩这个游戏了"之间的那道缝隙，恰恰是 RL 实践的所在，
+也正是这个项目被搭建来让你直接体会到的那道缝隙。
 
 ---
 
-## 6. Glossary
+## 6. 术语表
 
-- **Agent / Environment** — the learner; the world it acts in.
-- **State / Observation** — what the agent sees each step (here: a few numbers).
-- **Action** — what it does (flap / noop).
-- **Reward** — the scalar feedback signal it maximizes.
-- **Return** — discounted sum of rewards over an episode.
-- **Policy (π)** — state → action; the learned strategy.
-- **Value / Q-function** — predicted return from a state / from a state-action pair.
-- **Episode** — one playthrough.
-- **γ (discount factor)** — weights near vs far future reward.
-- **On-policy / Off-policy** — whether the algorithm can reuse old experience (PPO no, DQN
-  yes).
-- **Reward shaping** — adding intermediate reward to speed learning.
-- **Reward hacking** — high reward without achieving the intended goal.
+- **Agent / Environment** —— 学习者；它在其中行动的世界。
+- **State / Observation** —— agent 每一步看到的东西（这里是：几个数字）。
+- **Action** —— 它做的事（flap / noop）。
+- **Reward** —— 它要最大化的标量反馈信号。
+- **Return** —— 一个 episode 内 reward 的折扣总和。
+- **Policy（π）** —— state → action；学到的策略。
+- **Value / Q-function** —— 从一个 state / 从一个 state-action 对预测出的 return。
+- **Episode** —— 一次完整游玩。
+- **γ（discount factor）** —— 给近期 vs 远期 future reward 赋权。
+- **On-policy / Off-policy** —— 算法能否复用旧经验（PPO 否，DQN 是）。
+- **Reward shaping** —— 加入中间 reward 以加速学习。
+- **Reward hacking** —— 拿到高 reward 却没达成本意的目标。

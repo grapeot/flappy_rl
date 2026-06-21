@@ -1,9 +1,9 @@
-"""Train a policy to play Flappy Bird (PPO by default, via Stable-Baselines3).
+"""训练一个 policy 来玩 Flappy Bird（默认 PPO，通过 Stable-Baselines3）。
 
-Runs headless and faster-than-real-time — no window, no sleeping (see docs/rfc.md
-Decision 2). NOT YET IMPLEMENTED; scaffold placeholder.
+以 headless、快于实时的方式运行——无窗口、无 sleep（见 docs/rfc.md 决策 2）。
+尚未实现；脚手架占位符。
 
-Intended shape:
+意图中的形态：
     from stable_baselines3 import PPO
     from flappy_rl.env import FlappyBirdEnv
     env = FlappyBirdEnv()
@@ -15,8 +15,8 @@ Intended shape:
 
 def main() -> None:
     raise SystemExit(
-        "train.py is a scaffold placeholder. Implementation (and reward design) is deferred "
-        "— see docs/concepts.md and docs/working.md."
+        "train.py 是脚手架占位符。实现（以及 reward 设计）被推迟"
+        "——见 docs/concepts.md 和 docs/working.md。"
     )
 
 
