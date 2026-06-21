@@ -16,7 +16,10 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
-    "playwright>=1.40",  # 网页播放器的视觉/链路验证（截图）
+]
+# 网页播放器的视觉/链路验证（截图）。本地用，CI 不装，避免下载 chromium。
+viz = [
+    "playwright>=1.40",
 ]
 
 [build-system]

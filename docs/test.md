@@ -71,3 +71,31 @@
 - 一个简短的训练 smoke test 完成并保存了一个 model。
 - 对于任何真实训练运行：报告 eval task metric *并且* 至少观看了一个渲染的
   episode，同时把观察记录到 `working.md` 中。
+
+## 当前测试实况（30 个测试）
+
+实际落地的测试文件，按层对应上文：
+
+- `tests/test_game.py`（第 1 层）：重力、拍翅、下落封顶、管道移动、撞顶/撞地、计分
+  一次、确定性、next_pipe、observation/frame_state。
+- `tests/test_env.py`（第 2 层）：SB3 `check_env` 对 sparse/shaped 两版均通过、reset/step
+  契约、Discrete(2)、随机 episode 跑到终止、seed 复现、两版 reward 值语义、truncate 阈值。
+- `tests/test_recorder.py`（回放 contract）：把 JSON schema 各必含字段钉死——schema 改了
+  而测试没同步，就说明 `docs/player.js` 可能对不上。
+- `tests/test_training_smoke.py`（第 3 层）：PPO 在真实 env 上训练极少步数、存/取模型、
+  录回放、metrics callback 记录 episode。不验证"学会了"，只验证管线不断。
+
+跑法：
+
+```bash
+uv pip install -e '.[dev]'
+PYTHONPATH=src python -m pytest tests/ -q
+```
+
+视觉验证（网页播放器/曲线）用 playwright，在 `.[viz]` extra 里，本地用 `python -m
+http.server` 起服务后截图核对；CI 不跑视觉测试。
+
+## CI
+
+`.github/workflows/ci.yml` 在 push / PR 到 `master` 时跑：`ruff check` + 全量 `pytest`
+（含训练 smoke test，会装 torch/SB3）。CI 只装 `.[dev]`，不装 playwright/chromium。
