@@ -103,19 +103,37 @@ observation 是一个小向量 —— 小鸟高度、垂直速度、到下一根
 MLP policy，它能在几分钟内学会。像素输入（CNN policy）是一个有文档记录的未来扩展，
 出于成本与聚焦的考虑被刻意排除在 v0 范围之外。
 
+## 决策 6 —— 回放走 JSON artifact + 网页播放器，而非烤死的 JS
+
+我们要能在网页里看小鸟玩出来的样子，并且能放到网上。做法是把数据和播放分开：
+训练/评估时把每一局逐帧录成一个 **JSON 文件**（一个 episode 一个文件，纯数据：
+每帧的 y、vy、管道位置、action、score，以及结局），网页里放**一份固定的 Canvas
+播放器（JavaScript）**，加载任意一个 episode JSON 就能把那一局重演。
+
+为什么不把每局直接烤成 JS：那样数据和代码缠在一起，无法做"同一个播放器对比版本一和
+版本二""把任意 artifact 拖进来就能播"这类事。JSON 是 artifact（小、可存档、可对比），
+播放器是写一次就复用的代码。JSON schema 是播放器的 contract，见 `docs/decisions.md`。
+
+## 决策 7 —— GitHub Pages 从 docs/ 发布
+
+`docs/index.html` 作为项目首页（GitHub Pages 原生支持从 `docs/` 发布）：放思路简介、
+两个 baseline 的训练曲线（reward/loss 随步数变化）、可点击播放的回放实例。所有图和
+回放都从训练落下来的 artifact 渲染。这和 `docs/` 里现有的 Markdown 存档不冲突——Pages
+只认 `index.html` 及其引用的资源，Markdown 照常作为存档存在。
+
 ## 技术栈
 
 - Python 3.11+，用 `uv` 在本地 `.venv` 中管理。
 - `gymnasium` 提供 env 契约。
 - `stable-baselines3`（+ `torch`）提供 PPO/DQN。
-- `pygame` 仅用于可选的渲染器。
+- `pygame` 仅用于可选的本地渲染器（网页回放走 JSON + Canvas，不依赖 pygame）。
 - `pytest` 做测试；`ruff` 做 lint。
+- 网页播放器：纯 HTML + Canvas + 原生 JS，无构建步骤，直接 GitHub Pages。
 
-## 待解问题（留给即将到来的 reward 讨论）
+## 关键决策已敲定
 
-1. Reward 形态：sparse（仅在过管/死亡时给）vs shaped（每帧存活、接近缝隙的奖励）。
-   权衡：学习速度 vs reward-hacking 的暴露面。
-2. Observation 设计：原始坐标 vs 相对坐标；向前暴露多少根管道。
-3. Episode 终止，以及任何 truncation 上限（防止一只"完美"的小鸟在评估时永远跑下去）。
-
-这些在此处被刻意悬而未决 —— 它们正是下一场对话的实质内容。
+reward 形态、observation 设计、episode 终止、数值旋钮，以及上面的回放/Pages 架构，
+都已在一轮聊天讨论中敲定，完整存档见 **[`decisions.md`](decisions.md)**。一句话摘要：
+observation 用相对坐标看一根管道；做两个 reward baseline（版本一真 sparse、版本二 dy
+垂直距离 shaping），版本三考虑重力的思路只记录不实现；episode 撞/出界即终止、过 50 管
+truncate；γ=0.99，起手 3-5M timesteps。

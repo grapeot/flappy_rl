@@ -15,6 +15,16 @@
 - 把项目工作语言定为中文，并把已有的全部文档（concepts/prd/rfc/test/README/AGENTS/
   working）和源码注释从英文改写为中文。技术术语（RL、policy、reward、PPO、DQN、
   Gymnasium 等）保留英文。
+- 一轮聊天敲定全部设计决策，存档进 `docs/decisions.md`：observation 用相对坐标看一根
+  管道；两个 reward baseline（版本一真 sparse `0/+1/-1`、版本二 dy 垂直距离 shaping），
+  版本三考虑重力的思路只记不实现；episode 撞/出界终止、过 50 管 truncate；γ=0.99、起手
+  3-5M timesteps。新增决策：回放走 JSON artifact + 网页 Canvas 播放器，GitHub Pages 从
+  `docs/` 发布（rfc.md 决策 6/7）。
+- 实现物理内核 `game.py`（Layer 1）：重力/拍翅/管道/碰撞/计分，全确定性，参数为命名
+  常量。配 12 个单元测试（`tests/test_game.py`），全绿。删掉过时的 `test_scaffold.py`
+  （game 已实现，不再是占位符）。
+- 物理手感验证：随机策略约 27 帧死、得分 0（瞎拍的鸟过不了第一根管——印证 sparse 之痛）；
+  "对准缝隙中心"启发式 seed0 过 20 管、撑 924 帧（游戏可解，RL 有东西可学）。难度合适。
 
 ## Lessons Learned
 
