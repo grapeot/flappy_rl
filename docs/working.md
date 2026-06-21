@@ -38,6 +38,17 @@
   terminate（撞/出界）+ truncate（过 50 管）、两版 reward 由 `RewardConfig.mode` 切换。
   装好 gymnasium 1.3 / SB3 2.9 / torch 2.12。配 `tests/test_env.py`（含 SB3 check_env
   对两版均通过、reward 值语义断言），全部测试 23 个全绿，ruff lint 通过。
+- 实现训练（`scripts/train.py` + `metrics.py` + `record_policy.py`）和泛化评估
+  （`scripts/evaluate.py`）。两版各训练 50 万步（PPO, γ=0.99）。
+- 训练结果（印证文档核心论点）：v1_sparse 首次打满 50 在 55,312 步、末50局平均 49.5；
+  v2_shaped 首次打满在 42,511 步、末50局平均 50.0。**shaped 学得更早更稳**，正是 sparse
+  vs shaped 张力的真实体现。两版 reward 与 task metric 同步上升，无 reward hacking。
+- 泛化测试（30 个全新 seed）：v1_sparse 打满率 100%，v2_shaped 96.7%。两版都真学会玩
+  （非记忆关卡），验证相对坐标 observation。有趣反转：sparse 泛化反略胜 shaped——shaped
+  的对齐项是代理目标，把策略轻微拉离"纯过管"。
+- 网页填充：`docs/index.html` 整合两版可切换回放、训练曲线（`curves.js`，reward+score
+  双线）、泛化表。playwright（networkidle 等待）截图视觉验证全部正确。删除不再引用的
+  `sample_episode.json`。
 
 ## Lessons Learned
 
