@@ -49,6 +49,14 @@
 - 网页填充：`docs/index.html` 整合两版可切换回放、训练曲线（`curves.js`，reward+score
   双线）、泛化表。playwright（networkidle 等待）截图视觉验证全部正确。删除不再引用的
   `sample_episode.json`。
+- 收尾：测试增至 30（补 recorder schema contract + 训练 smoke test），配 GitHub Actions
+  CI（ruff + pytest）。隐私 review 通过（sub-agent 扫描）。design skill 评估后重做网页
+  视觉（深色 hero + 卡片 + 设计 token）。`scripts/render_gif.py` 生成 README 用的过管
+  GIF。README 重写贴图。
+- 发布到 public repo **https://github.com/grapeot/flappy_rl**（master 分支）。CI 绿；
+  branch protection 要求 `test` check 通过 + strict；watch all activities；GitHub Pages
+  从 master/docs 部署到 **https://grapeot.github.io/flappy_rl/**，playwright 验证线上
+  回放/曲线/泛化数据全部正确加载。
 
 ## Lessons Learned
 
