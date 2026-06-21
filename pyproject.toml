@@ -17,9 +17,11 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
-# 网页播放器的视觉/链路验证（截图）。本地用，CI 不装，避免下载 chromium。
+# 本地生成资产用：网页视觉验证（playwright 截图）+ GIF 渲染（pillow）。
+# CI 不装，避免下载 chromium。
 viz = [
     "playwright>=1.40",
+    "pillow>=10.0",
 ]
 
 [build-system]
